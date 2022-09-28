@@ -1,8 +1,18 @@
 #!/usr/bin/env ruby
 
+require 'bundler/inline'
+
+gemfile do
+  source 'https://rubygems.org'
+  gem 'nokogiri'
+end
+
+require 'json'
+
 require_relative './lib/argv_parser'
-require_relative './lib/file_writer'
+require_relative './lib/file_system'
 require_relative './lib/http_client'
+require_relative './lib/metadata_reader'
 
 def die(message:)
   STDERR.puts(message)
@@ -17,13 +27,26 @@ die(message: "at least one http/https URL is required") if uris.empty?
 
 # fail-fast
 uris.each do |uri|
-  client = HttpClient.new
-  body = client.get(uri: uri)
+  fs = FileSystem.new(uri: uri)
 
-  writer = FileWriter.new(uri: uri)
-  save_to = writer.save(content: body)
+  if parser.metadata_mode?
+    # the file must exist
+    metadata = fs.open do |f|
+      metadata_reader = MetadataReader.new(f)
+      metadata_reader.read
+    end
 
-  puts "The content of #{uri} is saved to #{save_to}"
+    puts "The metadata of #{uri}:"
+    puts JSON.pretty_generate(metadata)
+  else
+    client = HttpClient.new
+    body = client.get(uri: uri)
+    fs.save(content: body)
+  
+    puts "The content of #{uri} is saved to #{fs.content_path}"
+  end
+rescue FileSystem::Error => e
+  die(message: "an error occured while processing #{uri}: #{e.message}")
 rescue HttpClient::Error => e
   die(message: "#{uri} returns an error: #{e.message}")
 end
