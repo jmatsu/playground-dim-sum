@@ -23,6 +23,12 @@ docker run --rm -v $(pwd):/usr/src  -it fetch:jmatsu /bin/bash
 - Use `raise` without custom errors for developer issues
 - Use custom errors when a problem may be propagated across modules.
 
+## DONE
+
+- [x] Section1
+- [x] Section2
+- wip Extra of Section2
+
 ## TODOs
 
 See the code comments.
