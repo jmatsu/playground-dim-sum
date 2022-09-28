@@ -27,7 +27,9 @@ docker run --rm -v $(pwd):/usr/src  -it fetch:jmatsu /bin/bash
 
 - [x] Section1
 - [x] Section2
-- wip Extra of Section2
+- partially done: Extra of Section2
+  - xjs may not work
+  - some assets like images in css are not supported
 
 ## TODOs
 
