@@ -1,0 +1,29 @@
+#!/usr/bin/env ruby
+
+require_relative './lib/argv_parser'
+require_relative './lib/file_writer'
+require_relative './lib/http_client'
+
+def die(message:)
+  STDERR.puts(message)
+  exit(1)
+end
+
+parser = ArgvParser.new(ARGV)
+
+uris = parser.uris
+
+die(message: "at least one http/https URL is required") if uris.empty?
+
+# fail-fast
+uris.each do |uri|
+  client = HttpClient.new
+  body = client.get(uri: uri)
+
+  writer = FileWriter.new(uri: uri)
+  save_to = writer.save(content: body)
+
+  puts "The content of #{uri} is saved to #{save_to}"
+rescue HttpClient::Error => e
+  die(message: "#{uri} returns an error: #{e.message}")
+end
