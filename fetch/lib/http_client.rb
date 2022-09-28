@@ -1,5 +1,6 @@
 require 'net/http'
 
+# Wraps network requests
 class HttpClient
   class Error < StandardError; end
 

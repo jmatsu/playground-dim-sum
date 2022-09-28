@@ -9,6 +9,7 @@ end
 
 require 'json'
 
+require_relative './lib/archiver'
 require_relative './lib/argv_parser'
 require_relative './lib/file_system'
 require_relative './lib/http_client'
@@ -21,7 +22,7 @@ end
 
 parser = ArgvParser.new(ARGV)
 
-uris = parser.uris
+uris = parser.uris.dup
 
 die(message: "at least one http/https URL is required") if uris.empty?
 
@@ -29,26 +30,47 @@ die(message: "at least one http/https URL is required") if uris.empty?
 uris.each do |uri|
   fs = FileSystem.new(uri: uri)
 
-  if parser.metadata_mode?
+  case parser.mode
+  when ArgvParser::Mode::DOWNLOAD, ArgvParser::Mode::ARCHIVE
+    begin
+      client = HttpClient.new
+      body = client.get(uri: uri)
+      fs.save_html(content: body)
+    
+      puts "The content of #{uri} is saved to #{fs.html_content_path}"
+    rescue HttpClient::Error => e
+      die(message: "#{uri} returns an error: #{e.message}")
+    end
+
+    # WIP
+    if parser.mode == ArgvParser::Mode::ARCHIVE
+      remote_prefix = [80, 443].include?(uri.port) ? "#{uri.scheme}://#{uri.host}" : "#{uri.scheme}://#{uri.host}:#{uri.port}"
+      local_prefix = fs.archive_dir_path
+
+      archiver = fs.open_html { |f| Archiver.new(f) }
+      uri_pairs = archiver.modify_assets!(local_prefix: local_prefix, remote_prefix: remote_prefix) do |html|
+        fs.save_html(content: html)
+      end
+
+      uri_pairs.each do |remote_uri, local_path|
+        body = client.get(uri: remote_uri)
+        fs.save_in_archive(content: body, path: local_path)
+      rescue HttpClient::Error => e
+        die(message: "#{remote_uri} returns an error: #{e.message}")
+      end
+    end
+  when ArgvParser::Mode::METADATA
     # the file must exist
-    metadata = fs.open do |f|
+    metadata = fs.open_html do |f|
       metadata_reader = MetadataReader.new(f)
       metadata_reader.read
     end
 
     puts "The metadata of #{uri}:"
     puts JSON.pretty_generate(metadata)
-  else
-    client = HttpClient.new
-    body = client.get(uri: uri)
-    fs.save(content: body)
-  
-    puts "The content of #{uri} is saved to #{fs.content_path}"
   end
 rescue FileSystem::Error => e
   die(message: "an error occured while processing #{uri}: #{e.message}")
-rescue HttpClient::Error => e
-  die(message: "#{uri} returns an error: #{e.message}")
 rescue => e
-  die(message: "an unexpected error occured while processing #{uri}: #{e.message}")
+  die(message: "an unexpected error occured while processing #{uri}: #{e.message} #{e.backtrace.join("\n")}")
 end

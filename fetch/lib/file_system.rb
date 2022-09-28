@@ -2,7 +2,9 @@ require 'fileutils'
 require 'tempfile'
 require 'uri'
 
-# @attr_reader [String] content_path a path of a content file
+# File Reader/Writer class.
+#
+# @attr_reader [String] html_content_path a path of a HTML file
 class FileSystem
   class Error < StandardError; end
   class FileNotFoundError < Error
@@ -11,36 +13,56 @@ class FileSystem
     end
   end
 
-  attr_reader :content_path
+  attr_reader :html_content_path
 
   # @param uri [URI] incoming URI
   def initialize(uri:)
     raise 'nil is not allowed for uri' if uri.nil?
     *@dirs, @filepart = split_path_segments(uri: uri)
-    @content_path = File.join(*@dirs, "#{@filepart}.html")
+    @html_content_path = File.join(*@dirs, "#{@filepart}.html")
   end
 
-  # @param context [String] the content to save
-  # @return [void]
-  def save(content:)
-    FileUtils.mkdir_p(*@dirs) unless @dirs.empty?
+  def archive_dir_path
+    "#{@html_content_path}.d"
+  end
 
-    Tempfile.open(['content', '.html']) do |f|
+  # @param content [String] the content to save as html
+  # @return [void]
+  def save_html(content:)
+    FileUtils.mkdir_p(File.join(@dirs)) unless @dirs.empty?
+
+    Tempfile.open('content') do |f|
         f.write(content)
 
         # for now, thi script overwrites the output anyway
-        FileUtils.mv(f.path, @content_path)
+        FileUtils.mv(f.path, @html_content_path)
+    end
+  end
+
+  # @param content [String] the content to save
+  # @param path [String] a path to save
+  # @return [void]
+  def save_in_archive(content:, path:)
+    raise "#{path} does not contain #{archive_dir_path}" unless path.start_with?(archive_dir_path)
+
+    FileUtils.mkdir_p(archive_dir_path)
+
+    Tempfile.open('content') do |f|
+        f.write(content)
+
+        # for now, thi script overwrites the output anyway
+        FileUtils.mv(f.path, path)
     end
   end
 
   # proxy for File#open
-  def open(&block)
-    raise FileNotFoundError.new(path: content_path) unless File.exist?(content_path)
+  def open_html(&block)
+    raise FileNotFoundError.new(path: html_content_path) unless File.exist?(html_content_path)
 
     if block_given?
-      File.open(content_path, &block)
+      File.open(html_content_path, &block)
     else
-      File.open(content_path)
+      File.open(html_content_path)
     end
   end
 
