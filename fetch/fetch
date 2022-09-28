@@ -49,4 +49,6 @@ rescue FileSystem::Error => e
   die(message: "an error occured while processing #{uri}: #{e.message}")
 rescue HttpClient::Error => e
   die(message: "#{uri} returns an error: #{e.message}")
+rescue => e
+  die(message: "an unexpected error occured while processing #{uri}: #{e.message}")
 end
